@@ -1,0 +1,19 @@
+{
+  "name": "soul-compiler",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.5.0",
+    "vitest": "^4.1.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.1",
+    "zod": "^4.3.6"
+  }
+}
