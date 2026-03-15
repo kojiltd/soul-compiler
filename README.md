@@ -530,11 +530,9 @@ Soul Compiler is released under the [Business Source License 1.1](LICENSE).
 
 ## Credits
 
-Soul Compiler was built by [Koji Limited](https://koji.ltd) ([@CodyChiuKoji](https://x.com/CodyChiuKoji)). Powered by [OpenClaw](https://openclaw.ai).
+Soul Compiler was built by [Koji Limited](https://koji.ltd) ([@CodyChiuKoji](https://x.com/CodyChiuKoji)).
 
-The thick reference approach — compiling personality from deep source materials rather than shallow descriptions — was developed through months of production iteration with live AI agents serving real users across multiple channels and languages.
-
-Special acknowledgment to the domain icons whose thinking patterns make our agents more than just tools: Warren Buffett, Charlie Munger, Paul Graham, Ray Dalio, Richard Feynman, Anne-Laure Le Cunff, Adam Grant, and many others whose work proves that depth of character comes from depth of source.
+Powered by [OpenClaw](https://openclaw.ai).
 
 ---
 
