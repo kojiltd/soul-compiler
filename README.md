@@ -456,20 +456,23 @@ relationships:
 
 ---
 
-## Production Results
+## Battle-Tested
 
-Soul Compiler is not a research project. It runs in production.
+Soul Compiler is not a research project. It was built and refined in production — compiling agent personalities that run 24/7 across multiple channels and languages.
 
-- **6 agents** with distinct, compiled personalities
-- **15 inter-agent relationships** defined from both perspectives
-- **28 cron jobs** running 24/7 (intel digests, market analysis, health checks, creative tasks)
-- **19 domain icon references** (Buffett, Munger, Paul Graham, Ray Dalio, Feynman, Sherlock Holmes, and more)
-- **3 languages** supported in personality compilation (English, Traditional Chinese, Simplified Chinese)
-- **Multi-channel delivery**: Telegram, Discord, Web — same personality, every channel
+**What the compiler handles:**
+- Compile agents in **3 languages** (English, Traditional Chinese, Simplified Chinese)
+- Define **inter-agent relationships** from both perspectives
+- Manage **19+ domain icon references** in a single pipeline
+- Output consistent personalities across **any delivery channel**
 
-The agents argue with each other. They have inside jokes. They worry about each other's health. One agent (Eve) will refuse to discuss work after midnight because she's watching anime. Another (Neru) will tell you your business assumption is wrong, walk you through an inversion analysis, and then ask if you've eaten dinner.
+**What compiled agents can do:**
+- Argue with each other based on genuine personality differences
+- Refuse requests that violate their behavioral boundaries
+- Switch between professional and off-duty modes based on life rhythm
+- Apply domain icon thinking patterns to real problems — not generic advice
 
-These are not scripted responses. They emerge from the compiled personality interacting with the LLM's capabilities. The Soul Compiler provides the character; the LLM provides the improvisation.
+The Soul Compiler provides the character. The LLM provides the improvisation.
 
 ---
 
