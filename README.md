@@ -5,10 +5,10 @@
 **Compile real personalities for AI agents. Not prompts. Souls.**
 
 [![License: BSL](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)]()
 [![Agents in Production](https://img.shields.io/badge/production_agents-6-brightgreen.svg)](#production-results)
 [![Cron Jobs](https://img.shields.io/badge/24%2F7_cron_jobs-28-orange.svg)](#production-results)
-[![GitHub Stars](https://img.shields.io/github/stars/openclaw/soul-compiler?style=flat)](https://github.com/openclaw/soul-compiler)
+[![GitHub Stars](https://img.shields.io/github/stars/kojiltd/soul-compiler?style=flat)](https://github.com/kojiltd/soul-compiler)
 
 [Quick Start](#quick-start) · [Pipeline](#pipeline-deep-dive) · [YAML Schema](#yaml-schema) · [Domain Icons](#domain-icons) · [Examples](#examples)
 
@@ -299,9 +299,9 @@ The post-compile editor uses a three-color system for reviewing compiled output:
 
 **Red — Remove.** A trait dimension has a precise numeric value, but a generic description contradicts or duplicates it. The precise version wins.
 
-**Yellow — Redundant.** The same concept appears in two sections (e.g., "admits mistakes" in both Cognitive Framework and Safety Rules). Wastes budget. Human decides which to keep.
+**Yellow — Conflict.** Potential contradiction or redundancy detected (e.g., a new domain icon's traits clashing with the agent's core personality). Human reviews and decides Accept or Reject.
 
-**Blue — New.** Content added by this compile that wasn't in the previous version. Typically from a newly added domain icon or cross-framework combination.
+**Green — Append.** Compatible content that will be included in the compiled output. No conflicts detected.
 
 The editor shows a live budget dashboard:
 
@@ -313,7 +313,7 @@ Section D (Personality)     ████░░░░░░         500 chars
 Section E (Dialogue)        ████████████░    4,200 chars
 Section F-I (Operations)    ████████░░       3,777 chars
 ─────────────────────────────────────────────────────────
-Total                       15,877 / 20,000  [79%]  ✅
+Total                       11,877 / 15,000  [79%]  ✅
 ```
 
 ---
@@ -530,9 +530,9 @@ Soul Compiler is released under the [Business Source License 1.1](LICENSE).
 
 ## Credits
 
-Soul Compiler was built by the [OpenClaw](https://github.com/openclaw) team.
+Soul Compiler was built by [Koji Limited](https://koji.ltd) ([@CodyChiuKoji](https://x.com/CodyChiuKoji)). Powered by [OpenClaw](https://openclaw.ai).
 
-The thick reference approach — compiling personality from deep source materials rather than shallow descriptions — was developed through 6 months of production iteration with live AI agents serving real users across multiple channels and languages.
+The thick reference approach — compiling personality from deep source materials rather than shallow descriptions — was developed through months of production iteration with live AI agents serving real users across multiple channels and languages.
 
 Special acknowledgment to the domain icons whose thinking patterns make our agents more than just tools: Warren Buffett, Charlie Munger, Paul Graham, Ray Dalio, Richard Feynman, Anne-Laure Le Cunff, Adam Grant, and many others whose work proves that depth of character comes from depth of source.
 
@@ -542,6 +542,6 @@ Special acknowledgment to the domain icons whose thinking patterns make our agen
 
 **Everyone's building XP systems. We built the character creator.**
 
-[Get Started](#quick-start) · [Read the Docs](https://docs.openclaw.ai/soul-compiler) · [Join Discord](https://discord.gg/openclaw)
+[Get Started](#quick-start) · [Why TRUE SOUL?](docs/WHY-TRUE-SOUL.md) · [中文版](README.zh-TW.md)
 
 </div>
