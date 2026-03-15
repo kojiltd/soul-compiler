@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soul Compiler</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    fetch('/app.jsx')
+      .then(r => r.text())
+      .then(code => {
+        const transformed = Babel.transform(code, { presets: ['react'] }).code;
+        const script = document.createElement('script');
+        script.textContent = transformed;
+        document.body.appendChild(script);
+      })
+      .catch(err => {
+        document.getElementById('root').innerHTML =
+          '<pre style="color:red;padding:20px">' + err.message + '</pre>';
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
