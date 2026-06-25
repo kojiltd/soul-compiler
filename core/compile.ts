@@ -163,6 +163,17 @@ async function loadPJPlaybook(): Promise<string> {
 }
 
 /**
+ * Distinctive dedup marker for a verbatim block (input.d or calibration): its first
+ * `**bold**` label, which the LLM keeps verbatim even while reflowing the body. Used
+ * to detect "this block is already in the section" before re-appending — a full-string
+ * match fails on any LLM reformat and would re-append an already-present block,
+ * duplicating it. Falls back to the whole trimmed block when there is no bold label.
+ */
+export function dedupMarker(block: string): string {
+  return block.match(/\*\*[^*]+\*\*/)?.[0] ?? block.trim();
+}
+
+/**
  * Load the model-calibration scaffold for an agent's model family, if declared.
  * Compiler-owned source at _system/model-calibration/<family>.md — injected into
  * Section F so model-wide weak spots (e.g. qwen3.6 referent/uncertainty calibration)
@@ -403,22 +414,20 @@ export async function compile(
       sectionContent = `[COMPILE ERROR: ${errMsg}]`;
     }
 
-    // Inject input.d/ verbatim content that wasn't already included
+    // Re-append input.d/ verbatim content the LLM dropped. Dedup on the block's
+    // first bold label, not the whole block: the LLM keeps the distinctive label
+    // while reflowing the body, so a full-string match would falsely re-append an
+    // already-present block and duplicate it in the section.
     for (const inputContent of relevantInputD) {
-      if (!sectionContent.includes(inputContent.trim())) {
+      if (!sectionContent.includes(dedupMarker(inputContent))) {
         sectionContent += "\n\n" + inputContent;
       }
     }
 
     // Guarantee the calibration scaffold survives into Section F — it is a hard
-    // model-correction rule. Dedup on the first bold rule-heading, not the whole
-    // string: the LLM keeps the distinctive heading verbatim but reflows the body,
-    // so a full-string match would falsely re-append and duplicate the scaffold.
-    if (section === "F" && calibration) {
-      const calibMarker = calibration.match(/\*\*[^*]+\*\*/)?.[0] ?? calibration.trim();
-      if (!sectionContent.includes(calibMarker)) {
-        sectionContent += "\n\n" + calibration;
-      }
+    // model-correction rule. Same bold-marker dedup as input.d above.
+    if (section === "F" && calibration && !sectionContent.includes(dedupMarker(calibration))) {
+      sectionContent += "\n\n" + calibration;
     }
 
     compiledSections.push({
