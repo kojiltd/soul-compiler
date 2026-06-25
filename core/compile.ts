@@ -410,10 +410,15 @@ export async function compile(
       }
     }
 
-    // Guarantee the calibration scaffold survives into Section F verbatim — it is a
-    // hard model-correction rule, not LLM-discretionary prose.
-    if (section === "F" && calibration && !sectionContent.includes(calibration.trim())) {
-      sectionContent += "\n\n" + calibration;
+    // Guarantee the calibration scaffold survives into Section F — it is a hard
+    // model-correction rule. Dedup on the first bold rule-heading, not the whole
+    // string: the LLM keeps the distinctive heading verbatim but reflows the body,
+    // so a full-string match would falsely re-append and duplicate the scaffold.
+    if (section === "F" && calibration) {
+      const calibMarker = calibration.match(/\*\*[^*]+\*\*/)?.[0] ?? calibration.trim();
+      if (!sectionContent.includes(calibMarker)) {
+        sectionContent += "\n\n" + calibration;
+      }
     }
 
     compiledSections.push({
