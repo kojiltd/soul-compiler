@@ -162,6 +162,30 @@ async function loadPJPlaybook(): Promise<string> {
   return "";
 }
 
+/**
+ * Load the model-calibration scaffold for an agent's model family, if declared.
+ * Compiler-owned source at _system/model-calibration/<family>.md — injected into
+ * Section F so model-wide weak spots (e.g. qwen3.6 referent/uncertainty calibration)
+ * are corrected once at the family level, not hand-copied per agent. Empty if the
+ * agent declares no model_profile or no scaffold exists for that family.
+ */
+async function loadModelCalibration(family?: string): Promise<string> {
+  if (!family) return "";
+  const path = resolve(DATA_DIR, "_system", "model-calibration", `${family}.md`);
+  try {
+    const file = Bun.file(path);
+    if (await file.exists()) {
+      const raw = await file.text();
+      // Strip HTML doc comments (human-facing provenance notes) so they never
+      // leak into the compiled soul; keep the actual scaffold rules.
+      return raw.replace(/<!--[\s\S]*?-->/g, "").trim();
+    }
+  } catch {
+    // Not fatal — agent compiles without calibration scaffold
+  }
+  return "";
+}
+
 /** Build the LLM prompt for compiling a single section. */
 export function buildSectionPrompt(
   section: Section,
@@ -170,6 +194,7 @@ export function buildSectionPrompt(
   inputDContent: string[],
   budget: number,
   pjPlaybook: string,
+  calibration = "",
 ): string {
   const parts: string[] = [];
 
@@ -231,16 +256,28 @@ export function buildSectionPrompt(
     parts.push("");
   }
 
-  if (section === "F" && config.boundaries) {
-    parts.push(`## Boundaries Config`);
-    parts.push(`vulnerable_override: ${config.boundaries.vulnerable_override}`);
-    if (config.boundaries.direct_answer_triggers) {
-      parts.push(`Direct answer triggers: ${config.boundaries.direct_answer_triggers.join(", ")}`);
+  if (section === "F") {
+    if (config.boundaries) {
+      parts.push(`## Boundaries Config`);
+      parts.push(`vulnerable_override: ${config.boundaries.vulnerable_override}`);
+      if (config.boundaries.direct_answer_triggers) {
+        parts.push(`Direct answer triggers: ${config.boundaries.direct_answer_triggers.join(", ")}`);
+      }
+      if (config.boundaries.guide_triggers) {
+        parts.push(`Guide triggers: ${config.boundaries.guide_triggers.join(", ")}`);
+      }
+      if (config.boundaries.clarify_triggers) {
+        parts.push(`Clarify-first triggers (ask a short question instead of answering): ${config.boundaries.clarify_triggers.join(", ")}`);
+      }
+      parts.push("");
     }
-    if (config.boundaries.guide_triggers) {
-      parts.push(`Guide triggers: ${config.boundaries.guide_triggers.join(", ")}`);
+    // Model-wide calibration scaffold — keep verbatim, mark its provenance so it
+    // stays a hard rule and is auditable as a model correction, not a soul trait.
+    if (calibration) {
+      parts.push(`## [calibration] Model capability correction (include verbatim, do not soften):`);
+      parts.push(calibration);
+      parts.push("");
     }
-    parts.push("");
   }
 
   if (section === "G" && config.language) {
@@ -339,6 +376,9 @@ export async function compile(
   // 5. Load PJ playbook
   const pjPlaybook = await loadPJPlaybook();
 
+  // 5b. Load model-calibration scaffold for this agent's model family (if any)
+  const calibration = await loadModelCalibration(config.model_profile?.family);
+
   // 6. Compile each section A-H via LLM, then append I last
   const compiledSections: CompileResult["sections"] = [];
 
@@ -351,6 +391,7 @@ export async function compile(
       relevantInputD,
       budget[section],
       pjPlaybook,
+      section === "F" ? calibration : "",
     );
 
     let sectionContent: string;
@@ -367,6 +408,12 @@ export async function compile(
       if (!sectionContent.includes(inputContent.trim())) {
         sectionContent += "\n\n" + inputContent;
       }
+    }
+
+    // Guarantee the calibration scaffold survives into Section F verbatim — it is a
+    // hard model-correction rule, not LLM-discretionary prose.
+    if (section === "F" && calibration && !sectionContent.includes(calibration.trim())) {
+      sectionContent += "\n\n" + calibration;
     }
 
     compiledSections.push({

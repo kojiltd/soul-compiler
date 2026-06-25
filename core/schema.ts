@@ -56,6 +56,17 @@ const BoundariesSchema = z.object({
   vulnerable_override: z.boolean().optional(),
   direct_answer_triggers: z.array(z.string()).optional(),
   guide_triggers: z.array(z.string()).optional(),
+  // Triggers that should make the agent ask a short clarifying question instead of
+  // answering. Expanded into Section F behavior alongside direct_answer_triggers.
+  clarify_triggers: z.array(z.string()).optional(),
+});
+
+// Model capability profile — selects which calibration scaffold to inject.
+// `family` keys into _system/model-calibration/<family>.md so agents on the same
+// local model share one model-wide calibration source instead of N hand-copies.
+const ModelProfileSchema = z.object({
+  family: z.string(),
+  size: z.string().optional(),
 });
 
 // Outfit sub-schema
@@ -76,6 +87,7 @@ const AgentConfigSchema = z
     traits: TraitDimensionsSchema,
 
     // Optional fields
+    model_profile: ModelProfileSchema.optional(),
     language: z.string().optional(),
     image: z.string().optional(),
     backstory: z.string().optional(),

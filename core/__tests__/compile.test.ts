@@ -122,6 +122,28 @@ describe("buildSectionPrompt", () => {
     const prompt = buildSectionPrompt("A", config, new Map(), [], 2000, "");
     expect(prompt).toContain("10%");
   });
+
+  test("Section F injects model-calibration scaffold tagged [calibration]", () => {
+    const config = makeConfig();
+    const prompt = buildSectionPrompt("F", config, new Map(), [], 1000, "", "代詞消歧 — 唔肯定就問");
+    expect(prompt).toContain("[calibration]");
+    expect(prompt).toContain("代詞消歧 — 唔肯定就問");
+  });
+
+  test("Section F includes clarify_triggers from boundaries", () => {
+    const config = makeConfig({
+      boundaries: { vulnerable_override: false, clarify_triggers: ["referent_ambiguous", "corrected_once"] },
+    });
+    const prompt = buildSectionPrompt("F", config, new Map(), [], 1000, "");
+    expect(prompt).toContain("referent_ambiguous");
+    expect(prompt).toContain("Clarify-first triggers");
+  });
+
+  test("calibration scaffold not injected into non-F sections", () => {
+    const config = makeConfig();
+    const prompt = buildSectionPrompt("A", config, new Map(), [], 2000, "", "代詞消歧 scaffold");
+    expect(prompt).not.toContain("代詞消歧 scaffold");
+  });
 });
 
 // ---------------------------------------------------------------------------
