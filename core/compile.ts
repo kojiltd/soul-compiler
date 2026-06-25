@@ -163,17 +163,6 @@ async function loadPJPlaybook(): Promise<string> {
 }
 
 /**
- * Distinctive dedup marker for a verbatim block (input.d or calibration): its first
- * `**bold**` label, which the LLM keeps verbatim even while reflowing the body. Used
- * to detect "this block is already in the section" before re-appending — a full-string
- * match fails on any LLM reformat and would re-append an already-present block,
- * duplicating it. Falls back to the whole trimmed block when there is no bold label.
- */
-export function dedupMarker(block: string): string {
-  return block.match(/\*\*[^*]+\*\*/)?.[0] ?? block.trim();
-}
-
-/**
  * Load the model-calibration scaffold for an agent's model family, if declared.
  * Compiler-owned source at _system/model-calibration/<family>.md — injected into
  * Section F so model-wide weak spots (e.g. qwen3.6 referent/uncertainty calibration)
@@ -282,10 +271,10 @@ export function buildSectionPrompt(
       }
       parts.push("");
     }
-    // Model-wide calibration scaffold — keep verbatim, mark its provenance so it
-    // stays a hard rule and is auditable as a model correction, not a soul trait.
+    // Model-wide calibration scaffold — appended verbatim after the LLM text in
+    // compile(), so it is shown here as reference only; the LLM must NOT reproduce it.
     if (calibration) {
-      parts.push(`## [calibration] Model capability correction (include verbatim, do not soften):`);
+      parts.push(`## Model calibration (appended verbatim automatically — do NOT copy into your output):`);
       parts.push(calibration);
       parts.push("");
     }
@@ -306,17 +295,25 @@ export function buildSectionPrompt(
     parts.push("");
   }
 
-  // input.d/ verbatim content
+  // input.d/ reference rules — appended verbatim after the LLM text in compile().
+  // Shown here as reference; the LLM must NOT reproduce them or the section duplicates.
   if (inputDContent.length > 0) {
-    parts.push(`## Verbatim Input (MUST include as-is in output):`);
+    parts.push(`## Reference rules for this section (appended verbatim automatically — do NOT copy, restate, summarize, or reformat them):`);
     for (const content of inputDContent) {
       parts.push(content);
     }
     parts.push("");
   }
 
+  const hasReference = inputDContent.length > 0 || (section === "F" && calibration.length > 0);
+
   parts.push(`## Instructions`);
   parts.push(`Write Section ${section} (${SECTION_TITLES[section]}) for ${config.name}.`);
+  if (hasReference) {
+    // The reference rules / calibration above are appended verbatim by compile(), so
+    // the LLM only writes the agent-voice lead-in — reproducing them would duplicate.
+    parts.push(`The reference rules / calibration above are appended verbatim after your text automatically. Write ONLY a short (1-2 sentence) agent-voice lead-in that frames them — do NOT reproduce, restate, or reformat the reference content itself.`);
+  }
   parts.push(`Stay within ${budget} characters. Write in ${config.language || "繁體中文"}.`);
   parts.push(`Agent identity floor: 10% minimum — the agent's own voice must always be present.`);
   parts.push(`Output ONLY the section content (no section header, no metadata).`);
@@ -414,19 +411,17 @@ export async function compile(
       sectionContent = `[COMPILE ERROR: ${errMsg}]`;
     }
 
-    // Re-append input.d/ verbatim content the LLM dropped. Dedup on the block's
-    // first bold label, not the whole block: the LLM keeps the distinctive label
-    // while reflowing the body, so a full-string match would falsely re-append an
-    // already-present block and duplicate it in the section.
+    // Append input.d verbatim ONCE, deterministically. buildSectionPrompt instructs
+    // the LLM to write only a lead-in and NOT reproduce these rules, so a single
+    // unconditional append guarantees the verbatim rules survive without duplicating
+    // them — no content-match dedup needed (an includes() check is brittle: it misses
+    // when the LLM reflows or relabels the rules, re-appending an already-present block).
     for (const inputContent of relevantInputD) {
-      if (!sectionContent.includes(dedupMarker(inputContent))) {
-        sectionContent += "\n\n" + inputContent;
-      }
+      sectionContent += "\n\n" + inputContent;
     }
 
-    // Guarantee the calibration scaffold survives into Section F — it is a hard
-    // model-correction rule. Same bold-marker dedup as input.d above.
-    if (section === "F" && calibration && !sectionContent.includes(dedupMarker(calibration))) {
+    // Calibration scaffold: same deterministic single verbatim append for Section F.
+    if (section === "F" && calibration) {
       sectionContent += "\n\n" + calibration;
     }
 

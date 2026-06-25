@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { compile, buildSectionPrompt, dataDir, dedupMarker } from "../compile.ts";
+import { compile, buildSectionPrompt, dataDir } from "../compile.ts";
 import { SECTIONS, type Section } from "../budget.ts";
 import type { AgentConfig } from "../schema.ts";
 import type { LLMCallFn } from "../compile.ts";
@@ -109,12 +109,13 @@ describe("buildSectionPrompt", () => {
     expect(prompt).toContain("hana");
   });
 
-  test("includes input.d content verbatim", () => {
+  test("includes input.d as reference rules, instructs not to reproduce", () => {
     const config = makeConfig();
     const inputD = ["## [Section D] micro-behaviors\n- Always greet warmly"];
     const prompt = buildSectionPrompt("D", config, new Map(), inputD, 1500, "");
     expect(prompt).toContain("Always greet warmly");
-    expect(prompt).toContain("Verbatim Input");
+    expect(prompt).toContain("Reference rules");
+    expect(prompt).toContain("do NOT reproduce");
   });
 
   test("instructs agent identity floor", () => {
@@ -123,11 +124,12 @@ describe("buildSectionPrompt", () => {
     expect(prompt).toContain("10%");
   });
 
-  test("Section F injects model-calibration scaffold tagged [calibration]", () => {
+  test("Section F shows calibration as reference, instructs not to reproduce", () => {
     const config = makeConfig();
-    const prompt = buildSectionPrompt("F", config, new Map(), [], 1000, "", "代詞消歧 — 唔肯定就問");
-    expect(prompt).toContain("[calibration]");
-    expect(prompt).toContain("代詞消歧 — 唔肯定就問");
+    const prompt = buildSectionPrompt("F", config, new Map(), [], 1000, "", "**代詞消歧** — 唔肯定就問");
+    expect(prompt).toContain("Model calibration");
+    expect(prompt).toContain("代詞消歧");
+    expect(prompt).toContain("do NOT copy");
   });
 
   test("Section F includes clarify_triggers from boundaries", () => {
@@ -143,26 +145,6 @@ describe("buildSectionPrompt", () => {
     const config = makeConfig();
     const prompt = buildSectionPrompt("A", config, new Map(), [], 2000, "", "代詞消歧 scaffold");
     expect(prompt).not.toContain("代詞消歧 scaffold");
-  });
-});
-
-describe("dedupMarker", () => {
-  test("extracts the first bold label from a verbatim block", () => {
-    const block = "## [Section F] 行為邊界\n\n**主動關心**：食飯飲水\n**溫柔堅定**：叫瞓";
-    expect(dedupMarker(block)).toBe("**主動關心**");
-  });
-
-  test("falls back to the whole trimmed block when there is no bold label", () => {
-    const block = "  - 早上 (07-09)：起身\n- 日間：返工  ";
-    expect(dedupMarker(block)).toBe("- 早上 (07-09)：起身\n- 日間：返工");
-  });
-
-  test("a section that reflowed the body but kept the label is detected as present", () => {
-    const block = "## [Section F] 行為邊界\n\n**主動關心**：原文";
-    // LLM reflowed wording but kept the bold label → marker present → NOT re-appended.
-    const reflowed = "邊界守則。**主動關心**：食飯飲水提醒，唔等問。";
-    expect(reflowed.includes(dedupMarker(block))).toBe(true);
-    expect(reflowed.includes(block.trim())).toBe(false); // full-string match would have failed
   });
 });
 
