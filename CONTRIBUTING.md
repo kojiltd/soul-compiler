@@ -64,4 +64,4 @@ Include:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's [BSL 1.1](LICENSE) license.
+By contributing, you agree that your contributions will be licensed under the project's [MIT](LICENSE) license.

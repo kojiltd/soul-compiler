@@ -8,6 +8,7 @@
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
+import * as CONFIG from "./config";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,10 +34,7 @@ export type DeployOptions = {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, "..", "data");
-const HOME = homedir();
-const WORKSPACE_BASE = resolve(HOME, "neru-workspace");
-const GATEWAY_PORT = 18789;
-const SESSIONS_PATH = resolve(HOME, ".openclaw", "sessions.json");
+const { WORKSPACE_BASE, GATEWAY_PORT, SESSIONS_PATH } = CONFIG;
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -179,7 +177,7 @@ async function ensureClaudeSymlink(workspacePath: string): Promise<void> {
  *
  * Steps:
  * 1. Read compiled file from data/4_compiled/{agent}-TRUE_SOUL.md
- * 2. Resolve workspace at ~/neru-workspace/{agent}-workspace/
+ * 2. Resolve workspace at <SOUL_WORKSPACE_BASE>/{agent}-workspace/
  * 3. Backup current SOUL.md with date suffix
  * 4. Copy to SOUL.md + AGENTS.md
  * 5. Ensure CLAUDE.md symlink -> AGENTS.md

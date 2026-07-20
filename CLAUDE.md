@@ -11,7 +11,7 @@ Default to using Bun instead of Node.js.
 - Agent Skill install: ~/.openclaw/skills/soul-compiler-v2/
 - Claude Skill install: ~/.claude/skills/soul-compiler-v2/
 - Compile output: ~/.openclaw/soul-configs/4_compiled/
-- Deploy target: ~/neru-workspace/<agent>-workspace/
+- Deploy target: <workspace-base>/<agent>-workspace/
 
 ## Rules
 - core/ changes must pass all tests before commit

@@ -10,12 +10,12 @@ uses the new personality on next gateway restart.
 
 ## Inputs
 
-- `agent` — the agent identifier (e.g. "eve", "kira", "neru")
+- `agent` — the agent identifier (e.g. "alpha", "beta")
 
 ## Outputs
 
-- `~/neru-workspace/{agent}-workspace/SOUL.md` — deployed personality
-- `~/neru-workspace/{agent}-workspace/AGENTS.md` — symlink or copy of SOUL.md
+- `<workspace-base>/{agent}-workspace/SOUL.md` — deployed personality
+- `<workspace-base>/{agent}-workspace/AGENTS.md` — symlink or copy of SOUL.md
 - Console report: diff summary, char count, deploy timestamp
 
 ## Steps
@@ -27,8 +27,8 @@ uses the new personality on next gateway restart.
    - Ask for confirmation: 「確認 deploy？呢個會覆蓋現有 SOUL.md。」
 4. **Backup current:** if existing SOUL.md present, copy to `SOUL.md.bak.{timestamp}`
 5. **Deploy:**
-   - Copy `4_compiled/{agent}.TRUE_SOUL.md` → `~/neru-workspace/{agent}-workspace/SOUL.md`
-   - Copy same file → `~/neru-workspace/{agent}-workspace/AGENTS.md`
+   - Copy `4_compiled/{agent}.TRUE_SOUL.md` → `<workspace-base>/{agent}-workspace/SOUL.md`
+   - Copy same file → `<workspace-base>/{agent}-workspace/AGENTS.md`
 6. **Verify:** read back deployed file and confirm char count matches compiled
 7. **Gateway note:** remind user to restart gateway for changes to take effect
    - 「Gateway 會 cache 檔案。記住 restart：`pkill -9 -f openclaw-gateway || true; nohup openclaw gateway run ...`」
@@ -55,6 +55,6 @@ uses the new personality on next gateway restart.
 
 ```
 /soul-deploy eve
-/soul-deploy kira
-/soul-deploy neru
+/soul-deploy alpha
+/soul-deploy beta
 ```

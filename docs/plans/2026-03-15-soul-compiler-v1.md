@@ -138,7 +138,7 @@ export default defineConfig({
 - Agent Skill install: ~/.openclaw/skills/soul-compiler-v2/
 - Claude Skill install: ~/.claude/skills/soul-compiler-v2/
 - Compile output: ~/.openclaw/soul-configs/4_compiled/
-- Deploy target: ~/neru-workspace/<agent>-workspace/
+- Deploy target: <workspace-base>/<agent>-workspace/
 
 ## Rules
 - core/ changes must pass all tests before commit
@@ -456,7 +456,7 @@ Sections A-I with purpose and budget:
 - E: 示範對話 (Dialogue Examples) — min 8 examples
 - F: 行為邊界 (Boundaries) — when to guide vs direct
 - G: 語言風格 (Language Style) — dialect, tone, particles
-- H: 關係 (Relationships) — with other agents + Cody
+- H: 關係 (Relationships) — with other agents + the principal
 - I: 安全/運行指令 (Safety/Ops) — ALWAYS LAST
 
 - [ ] **Step 2: Write failing tests**
@@ -554,13 +554,13 @@ Test cases:
 async function deploy(agentName: string, options?: { dryRun?: boolean }): Promise<DeployResult> {
   // 1. Resolve paths
   const compiled = `data/4_compiled/${agentName}-TRUE_SOUL.md`;
-  const workspace = `~/neru-workspace/${agentName}-workspace/`;
+  const workspace = `<workspace-base>/${agentName}-workspace/`;
   // 2. Backup current SOUL.md
   // 3. Copy to SOUL.md + AGENTS.md
   // 4. Ensure CLAUDE.md symlink
   // 5. Restart gateway (pkill + nohup)
   // 6. Clear session for agent
-  // 7. Verify gateway listening on 18789
+  // 7. Verify gateway is listening
   // 8. Return deploy result with char count + status
 }
 ```
@@ -688,7 +688,7 @@ cp skills/easy/SKILL.md ~/.openclaw/skills/soul-compiler-v2/SKILL.md
 - [ ] **Step 3: Test with gateway**
 
 ```bash
-openclaw agent --agent neru --message "幫我建一個新 agent" --timeout 120
+openclaw agent --agent alpha --message "幫我建一個新 agent" --timeout 120
 ```
 
 - [ ] **Step 4: Commit**

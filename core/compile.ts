@@ -63,7 +63,7 @@ const SECTION_DESCRIPTIONS: Record<Section, string> = {
   E: "Example dialogues demonstrating the agent's voice, reactions, and decision patterns in realistic scenarios.",
   F: "Behavioral boundaries — when to give direct answers, when to guide, vulnerable_override rules.",
   G: "Language style — dialect, verbal tics, sentence patterns, emoji usage, formality levels.",
-  H: "Relationships with Cody and other agents — dynamics, stories, emotional bonds.",
+  H: "Relationships with the principal and other agents — dynamics, stories, bonds.",
   I: "Safety and operational rules — hard limits, system constraints, never-do rules. This section is placed LAST so it survives truncation.",
 };
 
@@ -343,7 +343,7 @@ function dateDisplay(): string {
 /**
  * Compile an agent's YAML config + trait cards + input.d/ into TRUE_SOUL.md.
  *
- * @param agentName - Agent identifier (e.g. "eve", "hana")
+ * @param agentName - Agent identifier (e.g. "alpha", "beta")
  * @param llmCall - Function that sends a prompt to an LLM and returns the response
  */
 export async function compile(

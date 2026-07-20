@@ -10,7 +10,7 @@ and missing specificity. Produces an actionable quality report.
 
 ## Inputs
 
-- `agent` — the agent identifier (e.g. "eve", "kira", "neru")
+- `agent` — the agent identifier (e.g. "alpha", "beta")
 
 ## Outputs
 
@@ -30,7 +30,7 @@ and missing specificity. Produces an actionable quality report.
 
 ## Steps
 
-1. **Load deployed SOUL.md:** from `~/neru-workspace/{agent}-workspace/SOUL.md`
+1. **Load deployed SOUL.md:** from `<workspace-base>/{agent}-workspace/SOUL.md`
 2. **Load source config:** parse `data/agent.{agent}/{agent}.yaml`
 3. **Budget check:** run `checkBudget()` and report utilization
 4. **Specificity scan:**
@@ -103,6 +103,6 @@ Re-compile after fixes: /soul-compile {agent}
 
 ```
 /soul-evaluate eve
-/soul-evaluate kira
-/soul-evaluate neru
+/soul-evaluate alpha
+/soul-evaluate beta
 ```

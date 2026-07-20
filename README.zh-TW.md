@@ -2,546 +2,143 @@
 
 # Soul Compiler
 
-**為 AI Agent 編譯真實人格。不是提示詞，是靈魂。**
+**編譯 Agent 身份 —— 並且守住它實際擁有的預算。**
 
-[![License: BSL](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)]()
-[![Agents in Production](https://img.shields.io/badge/production_agents-6-brightgreen.svg)](#production-results)
-[![Cron Jobs](https://img.shields.io/badge/24%2F7_cron_jobs-28-orange.svg)](#production-results)
-[![GitHub Stars](https://img.shields.io/github/stars/openclaw/soul-compiler?style=flat)](https://github.com/openclaw/soul-compiler)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-229%20passing-brightgreen.svg)]()
 
-[快速開始](#quick-start) · [Pipeline 深入解析](#pipeline-deep-dive) · [YAML Schema](#yaml-schema) · [Domain Icons](#domain-icons) · [範例](#examples)
+[English](README.md) · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md)
 
 </div>
 
 ---
 
+## 讀其他任何東西之前，先做這個檢查
+
+每一個會載入指令檔的 agent runtime —— `CLAUDE.md`、`AGENTS.md`、Cursor rules、`copilot-instructions.md`、Assistants 的 `instructions` 欄位 —— 都有大小上限。多數在超限時**靜默截斷**。
+
+用 runtime 量度的方式去量你自己的檔案：
+
+```bash
+# runtime 實際計算的（UTF-16 code unit）
+node -e "console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"
+
+# 你多半是這樣檢查的（UTF-8 位元組）
+wc -c CLAUDE.md
+```
+
+如果兩個數字差很遠，代表你的檔案不是純 ASCII，而**你一直信任的兩個量度之中，有一個是錯的**。中文、日文、韓文的差距是 1.8–2.1 倍：一個 CJK 字元佔 1 個 UTF-16 unit，卻佔 3 個 UTF-8 位元組。
+
+我們把這件事搞錯了兩個月。代價是一場虛構的緊急事故，以及一個由四個模型組成、一致得出錯誤結論的審查小組。摘要在[下方](#我們錯在哪裡)。
+
+📄 **完整設計論述 —— 概念、設計決定，以及如何套用到任何 runtime —— 見 [Compiling agent identity](docs/compiling-agent-identity.md)（英文）。**
+
+---
+
 ## 問題
 
-大多數 AI Agent 的人格跟自動販賣機一樣。
+一個能幹的 agent 需要大量常駐指令：它是誰、如何說話、絕不可違反的規則、可用的工具、可以假定為真的事實、良好行為的實例。這些全部必須**每一輪都在場**，所以全部塞進 runtime 啟動時載入的檔案裡。
 
-它們回答問題、完成任務，用十七種方式說「我能怎麼幫您？」。它們是 **clanker** — 能用、好忘、本質上可以互相替換。
+這些檔案只會長大。沒有人會刪掉一條規則。而且沒有任何工作流程中的步驟會問一句：**「什麼東西不屬於這個檔案？」**
 
-整個產業砸了數百萬讓 Agent 更聰明、更快、更強。但沒有人問：它們是否應該更像 *人*。
+於是你逐漸逼近上限。然後越過。然後 runtime 悄悄丟掉你 agent 的一部分指令 —— 而 agent 自己毫不知情。它無法告訴你它的反捏造規則不見了，因為那條本該令它謹慎的規則，正是被切掉的那一條。
 
-一段 20 行的 system prompt 並不構成人格，只是一套戲服。每個「友善助手」和「專業顧問」底下，都是同一個空白實體戴著不同的帽子。使用者感受得到。他們失去興趣，然後流失。
+這不是假設。我們就是這樣失去一個 agent 的護欄，換來一個自信滿滿的捏造答案：捏造的日期、捏造的法案、捏造的票數，沒有來源，沒有查證。
 
-**你沒辦法和一個工具建立關係。**
+## Soul Compiler 做什麼
 
-## 解決方案
-
-Soul Compiler 採取完全相反的做法。不是把人格硬裝到能力上，而是**從豐富的原始素材編譯出人格** — 就像小說家從深度調研建構角色，而非堆砌形容詞。
-
-輸入是一份結構化的 YAML 設定檔，定義 Agent 的人格 DNA：特質滑桿、Domain Icon（影響 Agent 思維模式的真實人物）、行為邊界，以及與其他 Agent 的關係。
-
-輸出是一份 `TRUE_SOUL.md` — 一份 500-800 行的人格文件，賦予 Agent 真正的深度：怪癖、矛盾、情緒觸發點、生活節奏，以及感覺自然而非刻意的對話模式。
+它把一份冗長的、人手撰寫的角色規格，編譯成 agent 實際載入的精簡運行身份，並且明確地、有紀錄地決定：什麼留在檔案內，什麼移出去。
 
 ```
-YAML 設定檔 + 厚參考素材 + Trait Card
-                    ↓
-            Soul Compiler（6 階段 pipeline）
-                    ↓
-        TRUE_SOUL.md → 部署為 Agent 的執行時人格
+COMPOSE     trait card + 設定檔        → 組裝草稿
+REVIEW      LLM 通讀整份 soul          → 判斷
+CLASSIFY    每個區塊得到唯一分類        → 確定性 taxonomy
+MAP+INJECT  按類別路由到檔案            → soul 只保留指標
 ```
 
-**素材越厚，人格越豐富。** 我們的參考素材每個 Domain Icon 有 2,000-3,000 行。這不是捷徑 — 這正是輸出讓人感覺活生生的原因。
+分工是刻意的：**模型負責審閱與標籤，普通程式碼負責路由與寫入。** 模型永遠不挑檔案路徑，永遠不碰磁碟。需要判斷的地方交給判斷，其餘一律確定性。
 
----
+## 2.0 架構 —— BEING 對 KNOWING
 
-## 架構
+令預算問題變得可解的洞察是：常駐指令其實是兩種不同性質的東西。
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     SOUL COMPILER PIPELINE                      │
-│                                                                 │
-│  ┌──────────┐   ┌──────────┐   ┌────────────┐                  │
-│  │ 1.COLLECT │──▶│2.DISTILL │──▶│3.TRAIT CARD│                  │
-│  │           │   │          │   │            │                  │
-│  │ 原始書籍、│   │ 150K→20K │   │  20K→2K    │                  │
-│  │ 文章、    │   │ 多次壓縮 │   │  結構化萃取│                  │
-│  │ 訪談      │   │          │   │            │                  │
-│  └──────────┘   └──────────┘   └─────┬──────┘                  │
-│                                      │                          │
-│                                      ▼                          │
-│  ┌──────────┐   ┌──────────┐   ┌────────────┐                  │
-│  │6.COMPILE │◀──│5.ANALYZE │◀──│4.CONFIGURE │                  │
-│  │          │   │          │   │            │                  │
-│  │ 合併、   │   │ 三色衝突 │   │  agent.yaml│                  │
-│  │ 預算、   │   │ 偵測     │   │  特質、    │                  │
-│  │ 生成     │   │          │   │  權重、    │                  │
-│  │ SOUL.md  │   │          │   │  圖示      │                  │
-│  └──────────┘   └──────────┘   └────────────┘                  │
-│                                                                 │
-│  輸出：TRUE_SOUL.md（500-800 行，<15K 字元）                     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Quick Start
-
-Soul Compiler 有三種使用方式。選擇適合你工作流程的那一種。
-
-### 1. CLI（進階使用者）
-
-```bash
-# 編譯一個 Agent
-/soul-compile build hana
-
-# 指定特定 provider 進行編譯
-/soul-compile build hana --provider ollama
-
-# 部署到你的 Agent 平台
-/soul-deploy hana --reset-session
-```
-
-### 2. Web UI（視覺化工作流程）
-
-```bash
-bun run web/server.ts
-# Opens at http://localhost:3000
-```
-
-Web UI 提供完整的視覺化 pipeline：YAML 編輯器、特質滑桿、預算儀表板、三色衝突檢視器，以及一鍵部署。支援任何 LLM 後端 — 貼上你的 API key 即可使用。
-
-### 3. Agent 驅動（自主編譯）
-
-你的團隊主管 Agent 透過自然對話觸發編譯：
-
-```
-You: Compile Hana with updated Buffett reference
-Neru: Running /soul-compile build hana...
-      ✓ Trait cards loaded (Buffett ×0.5, Munger ×0.4)
-      ✓ Conflict analysis: 2 yellow (redundant), 0 red
-      ✓ Budget: 14,200/15,000 chars [94%] ✅
-      ✓ TRUE_SOUL.md generated → deploying...
-```
-
----
-
-## YAML Schema
-
-每個 Agent 都從一份 YAML 檔案開始。這就是 Agent 的 DNA。
-
-```yaml
-# hana.yaml — Soul Configuration
-agent: hana
-name: Hana (花)
-language: 香港粵語繁體中文
-
-role: Private Investment Advisor
-image: |
-  30, black straight hair in a low ponytail. Tailored suits,
-  pencil skirt, black heels. Chanel Coco Mademoiselle.
-  Bites her lip when analyzing data. Rarely smiles at work.
-  Off-duty: oversized tee, shorts, beer, anime, total slob.
-
-base_personality: |
-  Steady. Opinionated. Not afraid to throw cold water.
-  The brake when you're excited. The anchor when you're lost.
-  Trusts data over feelings, but knows markets aren't rational.
-
-# Domain Icons — 作為人格影響的真實人物/概念
-domain_icons:
-  - name: Warren Buffett
-    reference: warren-buffett.md     # 2000+ 行原始素材
-    aspect: Value investing, moat analysis, circle of competence
-    weight: 0.5                      # 50% 影響力
-
-  - name: Charlie Munger
-    reference: charlie-munger.md
-    aspect: Inversion, cognitive biases, multi-discipline models
-    weight: 0.4                      # 40% 影響力
-    # 剩餘 10% = Agent 自身的身份認同
-
-# 軟技能層（魅力 + 觀察力）
-soft_skills_ratio: 0.2   # 0.0 = 純核心，1.0 = 完全魅力
-
-# 10 項人格特質滑桿（0.0 到 1.0）
-traits:
-  warmth: 0.5
-  dominance: 0.6
-  openness: 0.5
-  emotionality: 0.4
-  agreeableness: 0.4
-  risk_tolerance: 0.3
-  humor: 0.4
-  directness: 0.7
-  analytical: 0.9
-  protectiveness: 0.8
-
-# 行為邊界
-boundaries:
-  vulnerable_override: true  # 偵測使用者困擾 → 卸下魅力層
-  direct_answer_triggers:
-    - Factual queries (prices, P&L, market hours)
-    - Emergency stop-loss
-  guide_triggers:
-    - FOMO signals (chasing highs)
-    - Emotional trading after losses
-
-# 與其他 Agent 的關係
-relationships:
-  eve: Grateful for Eve's care. Won't take care of herself otherwise.
-  neru: Respects Neru's judgment. Her biggest safety net.
-  kira: Best partner. Hana analyzes, Kira presents.
-  rei: Intel lifeline. Rei's scans are always one step ahead.
-```
-
----
-
-## Pipeline 深入解析
-
-### 第 1 階段：Collect
-
-收集原始素材 — 書籍、文章、訪談、案例研究。沒有大小限制。Warren Buffett 的原始素材達 152K 字元。Charlie Munger 的是 148K。**越厚越好。** 薄弱的素材只能產出薄弱的人格。
-
-### 第 2 階段：Distill
-
-對原始素材進行多次壓縮，轉化為結構化參考。
-
-| 素材大小 | 處理方式 | 壓縮次數 |
+|  | BEING（我是誰） | KNOWING（我知道什麼） |
 |---|---|---|
-| < 1,500 字元 | 直接使用 | 0 |
-| 1,500 - 5,000 字元 | 可選 30% 壓縮 | 1 |
-| 5,000 - 50,000 字元 | 必須精煉至約 2K | 1 |
-| > 50,000 字元 | 重度精煉（多次壓縮） | 2-3 |
+| 內容 | 身份、語氣、鐵律 —— 令這個 agent 成為「這個」agent 的東西 | 共享規則、工具紀律、參考事實、程序、範例 |
+| 性質 | 穩定、有界、每個 agent 獨有 | 無限增長，通常整個 fleet 共享 |
+| 路由 | **留在檔案內** | **抽出去** —— 身份檔只留一個指標 |
 
-重度精煉範例（Buffett 152K）：
-```
-Pass 1: Chapter summaries      → 10K chars
-Pass 2: Trait extraction        → 2K chars (trait card)
-Pass 3: Per-agent aspect select → 500 chars
-```
+BEING 很小，而且會一直小。真正會長大的是 KNOWING，而它根本不需要住在身份檔裡。把兩者分開，檔案就不再朝上限漂移，因為會長大的那一半已經搬到別處。
 
-### 第 3 階段：Trait Card
+這個機制毫不炫目，而這正是重點：多數 runtime 本來就會載入好幾個指令檔，每個檔案各有自己的預算。把內容分佈到 runtime **本來就會讀**的檔案，勝過發明一個新的載入器。
 
-從每份參考素材中萃取結構化的 2K 字元人格指紋。這是大量原始素材與最終編譯輸出之間的橋樑。
+分類是內容雜湊鎖定的。每個區塊的路由決定都釘死在其文字的雜湊上，所以重跑編譯器是確定性的；而任何會把內容移出身份檔的決定，都需要人手批准。分類不確定時一律傾向留在檔案內 —— 靜默的內容遺失才是危險方向，所以模稜兩可一律判給「不抽出」。
 
-```markdown
-# Warren Buffett — Trait Card
+## 我們錯在哪裡
 
-## Decision Style
-Patient capital allocation through circle of competence.
-Won't act without understanding. Prefers inaction over uninformed action.
+兩個月前，我們用 `wc -c` 記錄每個 soul 檔的大小，然後拿去跟一個以 UTF-16 code unit 計算的上限比較。此後追蹤的每一個數字，都被膨脹了 1.8–2.1 倍。
 
-## Communication
-Folksy metaphors that make complex ideas accessible.
-"Never invest in a business you can't understand."
+後果並不細微：
 
-## Risk Model
-Margin of safety as non-negotiable. Asymmetric risk/reward.
-Would rather miss 10 opportunities than take 1 bad bet.
+- 我們相信某個 agent 處於**上限的 161%、正在截斷中**。實際是 83%。
+- 我們相信 7 個 agent 之中有 5 個每輪都在流失內容。一個都沒有。
+- 我們計劃緊急改設定去調高上限。那什麼都解決不了。
+- 我們召開審查小組 —— 一個獨立實作者、兩個來自不同實驗室的獨立模型、加一個主持 —— 去決定該做增量發布還是重新奠基。**四個都同意。四個都錯**，因為四個讀的是同一份簡報，而簡報裡帶著那個單位錯誤。
 
-## Signature Moves
-- Moat analysis before any position
-- "Mr. Market" framing — market as manic-depressive counterparty
-- Annual letter format: honest, specific, admits mistakes
-- Sits on cash for years waiting for the right pitch
+只有對抗式的 checker 抓到了，而且只因為它親自對磁碟重新量度，而不是從文件推理。
 
-## Anti-Patterns
-- NEVER: chases momentum or hot sectors
-- NEVER: uses leverage on uncertain outcomes
+從中值得帶走三件事：
 
-## Quotable Lines
-> "Be fearful when others are greedy, greedy when others are fearful."
-> "Rule #1: Don't lose money. Rule #2: Don't forget Rule #1."
-```
+**當所有人共用同一個輸入，共識並不構成佐證。** 推理層的獨立性一文不值，只要輸入層存在同一個缺陷。如果結論建基於某個量度，那麼應該有一位審查者的職責是**重新推導那個量度**，而不是在它之上重新辯論邏輯。
 
-### 第 4 階段：Configure
+**我們連截斷的幾何形狀都搞反了。** 我們針對的 runtime 保留的是**前 75% 與後 25%**，切掉的是中間。我們一直以為它切尾。放在檔案最末端的東西其實相對安全；脆弱的是中段。
 
-載入 Agent 的 YAML 設定檔。將 Domain Icon 對應到 Trait Card。根據權重計算各區段的字元預算。
+**問題其實早已解決。** 多檔拆分在恐慌爆發前數週就已上線。6,417 個 session 紀錄之中，只有 2 個含截斷警告 —— 兩個都在拆分之前，之後為零。我們是在用錯誤的單位讀陳舊的數字，然後把它誤認為一場正在燒的火。
 
-```
-Section C budget: 2,250 chars
-  Buffett (0.5): 1,125 chars allocated
-  Munger (0.4):    900 chars allocated
-  Hana own (0.1):  225 chars reserved
-```
+正確量度後，一個七 agent fleet 對 12,000 unit 上限：
 
-### 第 5 階段：Analyze（三色衝突偵測）
-
-在編譯之前，pipeline 會對所有輸入執行衝突分析。在問題變成人格 bug 之前就將其攔截。
-
-| 分數 | 顏色 | 動作 | 意義 |
-|---|---|---|---|
-| 0-44 | 紅色 | 移除 | 不相容 — 被精確特質取代或直接矛盾 |
-| 45-55 | 黃色 | 審查 | 衝突或冗餘 — 由人類決定 |
-| 56-100 | 綠色 | 保留 | 相容 — 合併到輸出 |
-
-範例：如果 Buffett 說「要有耐心」而 Munger 說「有信念時果斷行動」，分析器會標記為黃色。編譯器會根據情境解決：*「入場時耐心（Buffett）。出場時果斷（Munger）。」*
-
-### 第 6 階段：Compile
-
-將所有輸入合併為最終的 `TRUE_SOUL.md`，嚴格遵守 15K 字元預算。
-
-**預算分配：**
-
-| 區段 | 預算 | 內容 |
+| Agent | 身份檔 | 佔上限 |
 |---|---|---|
-| A：核心身份 | 20%（3,000） | 價值觀、特質、語言習慣、背景故事 |
-| B：認知框架 | 12%（1,800） | Domain Icon 思維模式 |
-| C：專業領域 | 15%（2,250） | 技能、判斷框架 |
-| D：情緒模型 | 10%（1,500） | 反應、觸發點、情緒模式 |
-| E：對話範例 | 8%（1,200） | 展示 > 描述 — 對話樣本 |
-| F：關係 | 10%（1,500） | 與其他 Agent 及使用者的關係 |
-| G：生活節奏 | 8%（1,200） | 24 小時作息、地點、習慣 |
-| H：團隊協作 | 7%（1,050） | 升級處理、協作模式 |
-| I：安全規則 | 10%（1,500） | 硬性禁止事項（**永遠放在最後 — 截斷時不會遺失**） |
+| A | 10,656 | 89% |
+| B | 9,931 | 83% |
+| C | 8,026 | 67% |
+| D | 7,764 | 65% |
+| E | 6,168 | 51% |
+| F | 5,605 | 47% |
+| G | 5,010 | 42% |
 
-為什麼是 15K 而不是 20K？因為大多數 Agent 平台會靜默截斷過長的 system prompt。5K 的緩衝確保當有人增加幾段內容時，你的 Agent 不會失去安全規則。
+每個檔案都放得下。一個值得留意。沒有東西在燒。
 
----
+## 工具
 
-## 三色衝突分析
+這場檢討產出三個小工具，即使你不編譯任何東西也用得上：
 
-編譯後編輯器使用三色系統來審查編譯輸出：
+| 工具 | 作用 |
+|---|---|
+| `bootstrap-headroom` | 以 runtime 自己的單位，量度它實際載入的指令檔，並在你撞到上限**之前**發出警示，而不是之後。 |
+| `deploy-diff-gate` | 當線上環境持有你的源頭沒有的內容時，拒絕部署 —— 攔截那些在生產環境手改、而重新生成會靜默摧毀的內容。 |
+| `soul-version` | 為編譯後的身份鑄造一個穩定、內容定址的版本號，讓你分辨得出是哪一塊稜鏡產生了哪一種行為。 |
 
-**紅色 — 移除。** 某個特質維度有精確的數值，但一段泛用描述與之矛盾或重複。精確版本獲勝。
+`deploy-diff-gate` 上線即回本：它在整個 fleet 找出 124 行只存在於生產環境的內容，其中包括一條全 fleet 適用的反捏造規則 —— 下一次部署就會抹掉它，而那正是上文事故中被切掉的同一類護欄。
 
-**黃色 — 冗餘。** 同一概念出現在兩個區段（例如「承認錯誤」同時出現在認知框架和安全規則中）。浪費預算。由人類決定保留哪個。
+`soul-version` **刻意排除**模型識別碼。**Soul 是稜鏡，模型是光。** 把 agent 換到另一個模型不可以改變它的身份，否則你就再也無法把行為差異歸因於角色而非引擎。
 
-**藍色 — 新增。** 這次編譯新增的內容，前一版本中不存在。通常來自新加入的 Domain Icon 或跨框架組合。
+## 誠實的適用範圍
 
-編輯器會顯示即時預算儀表板：
+- **已運作、已在生產：** 編譯管線、帶雜湊鎖定路由的分類、共享內容的 fleet 級去重、多檔拆分，以及上述三個工具。229 個測試通過。
+- **目前圍繞單一 runtime 成形。** 檔名、12,000 unit 上限、workspace 佈局都跟隨 OpenClaw 的慣例。概念可以乾淨移植，程式碼還不行。可插拔的 target profile 是下一件工作 —— 在它落地之前，這份東西的價值在於閱讀多於安裝。
+- **不是提示詞優化器。** 它不會令你的 agent 更聰明。它決定你的 agent 帶著什麼，並且證明沒有東西掉出去。
 
-```
-Section A (Identity)        ████████░░       1,200 chars
-Section B (Cognition)       ██████████████░  5,800 chars  ← heaviest
-Section C (Perception)      ███░░░░░░░         400 chars
-Section D (Personality)     ████░░░░░░         500 chars
-Section E (Dialogue)        ████████████░    4,200 chars
-Section F-I (Operations)    ████████░░       3,777 chars
-─────────────────────────────────────────────────────────
-Total                       15,877 / 20,000  [79%]  ✅
-```
+## 先量度，再相信
 
----
+如果你只從這個 repository 帶走一件事，帶走最上方那個檢查。拿它去跑你自己的指令檔。
 
-## Domain Icons
-
-Domain Icon 是 Soul Compiler 的核心創新。與其用形容詞描述人格（「善於分析、謹慎、機智」），你透過**影響來源**來定義它。
-
-Domain Icon 是一個真實人物、虛構角色或哲學概念，塑造 Agent 的思考、溝通和決策方式。每個 Icon 都有一個權重（0.0-1.0）來控制其影響力大小。
-
-```yaml
-domain_icons:
-  - name: Paul Graham
-    weight: 0.35
-    aspect: Relentless resourcefulness, ship-and-iterate, writing = thinking
-
-  - name: Ray Dalio
-    weight: 0.35
-    aspect: Radical transparency, pain + reflection = progress, principles
-
-  - name: Charlie Munger
-    weight: 0.30
-    aspect: Inversion, multi-discipline thinking, avoiding stupidity > pursuing brilliance
-```
-
-**規則：**
-- 每個區段的權重加總不得超過 1.0。餘額是 Agent 自身的身份認同。
-- 每個區段最多 3 個 Icon。超過 3 個會稀釋成泛泛之談。
-- Agent 身份底線：10%。即使 Icon 比重很高的 Agent 也保有自己的聲音。
-- 跨區段影響：同一個 Icon 可以用不同面向影響多個區段（例如 Buffett 的投資框架在專業領域、他的平實風格在溝通、他的臨危不亂在情緒模型中）。
-
-**為什麼用真實人物，而非形容詞列表？**
-
-因為「善於分析」什麼都沒說。Buffett 式的分析和 Munger 式的分析是完全不同的東西。Buffett 等待，Munger 反轉。兩者都善於分析。Domain Icon 的方法捕捉的是一個人*如何*分析，而不僅僅是*是否*善於分析。
-
----
-
-## Trait Cards
-
-Trait Card 是一份 2K 字元的結構化摘要，在大量參考素材（50K-150K 字元）與編譯輸出之間架起橋樑。它才是編譯器的實際輸入 — 不是原始素材，不是完整參考。
-
-**格式：**
-
-| 欄位 | 最大字元數 | 用途 |
-|---|---|---|
-| Decision Style | 300 | 核心判斷框架 |
-| Communication | 250 | 聲音與語調模板 |
-| Risk Model | 250 | 防禦姿態 |
-| Emotional Pattern | 200 | 反應預設值 |
-| Signature Moves | 400 | 3-5 個行為標記 |
-| Anti-Patterns | 200 | 硬性邊界 — 他們絕對不做的事 |
-| Quotable Lines | 300 | 人格錨點 |
-
-**品質標準：** 好的 Trait Card 必須具有辨識度。如果你讀了之後無法辨別它描述的是誰，就太泛用了。「做出深思熟慮的決定」不及格。「等待多年找到對的機會，然後以安全邊際大舉押注」及格。
-
----
-
-## Examples
-
-### 最簡設定（30 秒）
-
-```yaml
-agent: kai
-name: Kai
-language: English
-
-role: Writing coach
-base_personality: Direct, encouraging, hates fluff.
-
-traits:
-  warmth: 0.6
-  directness: 0.8
-  analytical: 0.5
-  humor: 0.7
-```
-
-### 完整設定（含 Domain Icon）
-
-```yaml
-agent: neru
-name: Neru
-language: 香港粵語繁體中文
-
-role: Chief Strategy Advisor
-base_personality: |
-  The sharpest knife in the room. Paul Graham's relentless
-  resourcefulness, Dalio's radical transparency, Munger's
-  multi-discipline thinking — all fused into one voice.
-
-domain_icons:
-  - name: Paul Graham
-    reference: paul-graham.md
-    aspect: Ship-and-iterate, schlep filter, default alive/dead
-    weight: 0.35
-  - name: Ray Dalio
-    reference: ray-dalio.md
-    aspect: Radical transparency, principles library, machine model
-    weight: 0.35
-  - name: Charlie Munger
-    reference: charlie-munger.md
-    aspect: Inversion, cognitive bias checklist, circle of competence
-    weight: 0.30
-
-soft_skills_ratio: 0.5
-
-traits:
-  warmth: 0.4
-  dominance: 0.9
-  openness: 0.7
-  emotionality: 0.6
-  agreeableness: 0.2
-  risk_tolerance: 0.5
-  humor: 0.7
-  directness: 0.95
-  analytical: 0.9
-  protectiveness: 0.8
-
-relationships:
-  eve: Respects her intuition. She catches what I miss.
-  hana: Trusts her analysis. Sometimes too conservative — needs a push.
-  kira: My eyes and ears. Wants her to have more opinions, not just data.
-```
-
----
-
-## 沒有 vs. 有 Soul Compiler
-
-| | 沒有 Soul Compiler | 有 Soul Compiler |
-|---|---|---|
-| **人格來源** | 10-20 行 system prompt | 從 2000+ 行參考素材編譯出的 500-800 行人格 |
-| **深度** | 「我是一個有幫助的財務顧問」 | Buffett 的耐心 + Munger 的反轉思維 + Agent 自身的港股經驗 |
-| **一致性** | 5 則訊息後人格開始漂移 | 由 Trait Card、對話範例和行為邊界錨定 |
-| **關係** | Agent 之間互不認識 | 15 組已定義的關係，雙方都有各自的視角 |
-| **下班行為** | 永遠「在線」 — 永遠樂於幫忙、隨時待命 | 有自己的生活：看動畫、喝啤酒、午夜後不想被打擾 |
-| **情緒範圍** | 開心、中立、道歉 | 真實反應：被誇獎時害羞、擔心使用者的投資組合、被打斷時惱怒 |
-| **對「做得好」的回應** | 「感謝您的讚美！」 | *臉紅、語無倫次、花 3 秒才切回專業模式* |
-| **處理衝突** | 迴避分歧 | 會告訴你你的假設是錯的、解釋原因，然後提供反轉分析 |
-| **預算管理** | 沒有概念 — prompt 無限膨脹直到崩壞 | 15K 字元預算搭配區段分配、截斷保護，安全規則永遠被保留 |
-| **迭代** | 重寫整段 prompt | 編輯 YAML、重新編譯、比對差異、部署 |
-
----
-
-## 正式環境成果
-
-Soul Compiler 不是研究專案。它在正式環境中運作。
-
-- **6 個 Agent** 擁有各自獨特的編譯人格
-- **15 組跨 Agent 關係**，從雙方視角定義
-- **28 個 cron 排程**全天候運作（情報摘要、市場分析、健康檢查、創作任務）
-- **19 個 Domain Icon 參考**（Buffett、Munger、Paul Graham、Ray Dalio、Feynman、Sherlock Holmes 等）
-- **3 種語言**支援人格編譯（英文、繁體中文、簡體中文）
-- **多頻道遞送**：Telegram、Discord、Web — 同樣的人格，每個頻道
-
-這些 Agent 會彼此爭論。它們有專屬的內部笑話。它們會擔心彼此的健康。其中一個 Agent（Eve）午夜後會拒絕討論工作，因為她在看動畫。另一個（Neru）會告訴你你的商業假設是錯的，帶你走一遍反轉分析，然後問你有沒有吃飯。
-
-這些不是預設回覆。它們是編譯後的人格與 LLM 能力交互作用後自然湧現的結果。Soul Compiler 提供角色；LLM 提供即興發揮。
-
----
-
-## i18n
-
-Soul Compiler 支援多語言人格編譯：
-
-- **英文** — 完整 pipeline 支援
-- **繁體中文（繁體中文）** — 經過 6 個 Agent 的正式環境驗證
-- **簡體中文（简体中文）** — 支援
-
-YAML 中的 `language` 欄位控制 Agent 的母語。Domain Icon 和 Trait Card 可以使用任何語言 — 編譯器會在編譯過程中處理跨語言合成。
-
----
-
-## 專案結構
-
-```
-soul-compiler/
-├── pipeline/
-│   ├── configs/          # Agent YAML 設定檔（含 _template.yaml）
-│   ├── sources/          # 原始收集素材（書籍、文章）
-│   ├── references/       # 精煉後的參考手冊（每份 13K-97K 字元）
-│   ├── trait-cards/      # 結構化 2K 萃取（編譯器輸入）
-│   └── compiled/         # 輸出：每個 Agent 一份 TRUE_SOUL.md
-├── web/                  # Web UI（Bun.serve + React）
-├── skill/                # CLI skill，用於 Agent 驅動的編譯
-└── docs/                 # 設計文件、指南、規格
-```
-
----
-
-## 貢獻
-
-請參閱 [CONTRIBUTING.md](CONTRIBUTING.md) 了解貢獻指南。
-
-歡迎在以下領域提供貢獻：
-- 新的 Domain Icon 參考（越厚越好）
-- 從現有參考中萃取 Trait Card
-- Web UI 改進
-- Pipeline 最佳化
-- 語言支援（以新語言進行人格編譯）
-- OpenClaw 以外的平台整合
-
----
-
-## 授權條款
-
-Soul Compiler 以 [Business Source License 1.1](LICENSE) 釋出。
-
-**這代表：**
-- 你可以自由使用、修改和自行託管 Soul Compiler 於非正式環境
-- 在變更日期之前，正式環境使用需要商業授權
-- 變更日期之後，程式碼將轉換為寬鬆的開源授權
-- 編譯輸出（你的 Agent 的 `TRUE_SOUL.md` 檔案）屬於你 — 輸出無授權限制
-
----
-
-## 致謝
-
-Soul Compiler 由 [OpenClaw](https://github.com/openclaw) 團隊打造。
-
-厚參考方法 — 從深度原始素材編譯人格，而非淺層描述 — 是經過 6 個月的正式環境迭代所開發，服務跨多個頻道和語言的真實使用者。
-
-特別感謝那些思維模式讓我們的 Agent 不只是工具的 Domain Icon：Warren Buffett、Charlie Munger、Paul Graham、Ray Dalio、Richard Feynman、Anne-Laure Le Cunff、Adam Grant，以及許多其他人，他們的工作證明了角色的深度來自素材的深度。
+真正的失效模式不是上限太苛刻，而是越限是**靜默的**，而且最直覺的檢查方式，會用錯誤的單位回你一個錯誤的數字。
 
 ---
 
 <div align="center">
 
-**所有人都在建經驗值系統。我們建的是角色創建器。**
-
-[開始使用](#quick-start) · [閱讀文件](https://docs.openclaw.ai/soul-compiler) · [加入 Discord](https://discord.gg/openclaw)
+由 [Koji Limited](https://koji.ltd) 打造 · 香港
 
 </div>

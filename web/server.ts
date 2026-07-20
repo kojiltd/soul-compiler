@@ -1,17 +1,18 @@
 import { readdir, readFile, writeFile, mkdir, copyFile, exists } from "fs/promises";
 import { join, basename } from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import * as CONFIG from "../core/config";
 
-const PORT = 3000;
+const PORT = CONFIG.WEB_PORT;
 const MOCK_MODE = process.argv.includes("--mock");
-const SOUL_CONFIGS = join(process.env.HOME!, ".openclaw", "soul-configs");
+const SOUL_CONFIGS = CONFIG.SOUL_CONFIG_DIR;
 const TEMPLATE_YAML = join(SOUL_CONFIGS, "_system", "_template.yaml");
 const PROMPTS_DIR = join(SOUL_CONFIGS, "_system", "prompts");
 
 if (MOCK_MODE) console.log("⚠️  MOCK MODE — LLM calls return simulated data");
 
 // --- Prompt Loader ---
-// Prompts are loaded from ~/.openclaw/soul-configs/_system/prompts/
+// Prompts are loaded from <SOUL_CONFIG_DIR>/_system/prompts/
 // This keeps compilation logic private and configurable.
 
 async function loadPrompt(name: string): Promise<string> {
@@ -73,7 +74,7 @@ async function readAgentData(name: string) {
 
 async function listOpenClawAgents(): Promise<Array<{ id: string; name: string; model: string }>> {
   try {
-    const configPath = join(process.env.HOME!, ".openclaw", "openclaw.json");
+    const configPath = CONFIG.RUNTIME_CONFIG_PATH;
     const raw = await readFile(configPath, "utf-8");
     const config = JSON.parse(raw);
     const agentList = config?.agents?.list || [];

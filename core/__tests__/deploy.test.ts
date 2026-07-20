@@ -2,15 +2,16 @@ import { test, expect, describe } from "bun:test";
 import { deploy, resolveWorkspace, resolveCompiledPath } from "../deploy.ts";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
+import { WORKSPACE_BASE } from "../config";
 
 // ---------------------------------------------------------------------------
 // resolveWorkspace tests
 // ---------------------------------------------------------------------------
 
 describe("resolveWorkspace", () => {
-  test("resolves to ~/neru-workspace/{agent}-workspace/", () => {
+  test("resolves to <SOUL_WORKSPACE_BASE>/{agent}-workspace/", () => {
     const path = resolveWorkspace("eve");
-    expect(path).toBe(resolve(homedir(), "neru-workspace", "eve-workspace"));
+    expect(path).toBe(resolve(WORKSPACE_BASE, "eve-workspace"));
   });
 
   test("different agents get different paths", () => {
@@ -71,9 +72,7 @@ describe("deploy dryRun", () => {
   });
 
   test("dryRun workspace path is correct", async () => {
-    const result = await deploy("sakura", { dryRun: true });
-    expect(result.workspacePath).toBe(
-      resolve(homedir(), "neru-workspace", "sakura-workspace"),
-    );
+    const result = await deploy("example", { dryRun: true });
+    expect(result.workspacePath).toBe(resolve(WORKSPACE_BASE, "example-workspace"));
   });
 });

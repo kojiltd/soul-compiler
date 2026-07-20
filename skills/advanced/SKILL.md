@@ -35,7 +35,7 @@ Each command maps to a step in the Soul Compiler pipeline.
      ↓
 /soul-compile → 4_compiled/{agent}.TRUE_SOUL.md
      ↓
-/soul-deploy → ~/neru-workspace/{agent}-workspace/SOUL.md + AGENTS.md
+/soul-deploy → <workspace-base>/{agent}-workspace/SOUL.md + AGENTS.md
      ↓
 /soul-evaluate → quality report
 ```

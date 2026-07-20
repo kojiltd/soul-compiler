@@ -33,3 +33,40 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 data
+
+# SC2.0 private koji overlay (decision #1 — not for GitHub)
+adapters/koji.ts
+adapters/koji.test.ts
+out-koji
+out-deploy
+out-wired
+*.soul.lock.json
+shared.registry.json
+
+# Private agent source material — live souls, group IDs, per-agent input.d
+# (board checker NEW-3, 2026-07-19: these were untracked but NOT ignored,
+#  so `git add -A` would have committed 7 live souls + real Telegram group IDs)
+out-deploy-inputs
+.backups
+
+# Private strategy (not for public repo)
+docs/plans/2026-06-26-public-repositioning-design.md
+
+# Internal working documents — infra topology, agent rosters, decision records.
+# The public-facing version of this material is docs/compiling-agent-identity.md
+docs/plans/2026-06-25-soul-compiler-2.0-architecture.md
+docs/plans/2026-06-09-soul-compiler-2.0-calibration-layer.md
+
+# Personal one-off run scripts — carry local context, no value to anyone else.
+# The reusable entry points are: sc2.ts, deploy-prep.ts, deploy-diff-gate.ts,
+# fold-orphans.ts, bootstrap-headroom.ts
+apply-v2-run.ts
+classify-run.ts
+inject-run.ts
+koji-run.ts
+lock-run.ts
+neru-recompile.ts
+recompile.ts
+review-run.ts
+shared-build-run.ts
+wired-run.ts

@@ -123,10 +123,15 @@ describe("interview", () => {
       expect(challenge.length).toBeGreaterThan(0);
     });
 
-    test("includes the original answer in the challenge when template has placeholder", () => {
-      // Use a field with templates that always include {answer}
-      const challenge = challengeVague("善良", "base_personality");
-      expect(challenge).toContain("善良");
+    test("substitutes the answer into every template that has a placeholder", () => {
+      // challengeVague picks a template at random, and not every base_personality
+      // template contains {answer} — asserting on one draw was flaky (~1 run in 5).
+      // Sample enough draws to see all templates, and assert the real invariant:
+      // whatever is returned, no unsubstituted placeholder survives, and at least
+      // one variant carries the answer through.
+      const draws = Array.from({ length: 200 }, () => challengeVague("善良", "base_personality"));
+      expect(draws.every((c) => !c.includes("{answer}"))).toBe(true);
+      expect(draws.some((c) => c.includes("善良"))).toBe(true);
     });
 
     test("uses field-specific challenges when available", () => {
